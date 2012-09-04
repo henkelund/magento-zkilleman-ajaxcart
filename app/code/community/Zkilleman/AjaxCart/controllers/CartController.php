@@ -34,6 +34,8 @@ require_once implode(DS, array(
 class Zkilleman_AjaxCart_CartController extends Mage_Checkout_CartController
 {
 
+    const EVENT_RESPONSE = 'ajaxcart_ajax_update_response';
+
     /**
      *
      */
@@ -102,15 +104,22 @@ class Zkilleman_AjaxCart_CartController extends Mage_Checkout_CartController
             }
         }
 
+        $responseObject = new Varien_Object(array(
+            'messages'      => $messages,
+            'sidebarHtml'   => $sidebarBlock ? $sidebarBlock->toHtml() : '',
+            'cartLink'      => $cartLink,
+            'action'        => $this->getRequest()->getActionName(),
+            'requestParams' => $this->getRequest()->getParams()
+        ));
+
+        Mage::dispatchEvent(
+                self::EVENT_RESPONSE, array('response_object' => $responseObject));
+
         // reset redirect headers and send response
         $this->getResponse()
             ->clearHeaders()
             ->setHttpResponseCode(200)
             ->setHeader('Content-type', 'application/json')
-            ->setBody(Mage::helper('core')->jsonEncode(array(
-                'messages'    => $messages,
-                'sidebarHtml' => $sidebarBlock ? $sidebarBlock->toHtml() : '',
-                'cartLink'    => $cartLink
-            )));
+            ->setBody($responseObject->toJson());
     }
 }
