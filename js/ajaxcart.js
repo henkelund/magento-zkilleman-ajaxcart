@@ -33,10 +33,20 @@
         _actionProductPattern: null,
         initialize: function(config)
         {
-            this._config               = config;
-            this._config.url           = config.url || '/ajax-cart/cart/';
+            this._config = $H(config || {});
             this._actionProductPattern = /\/product\/(\d*)\D|$/;
+            if (!this.getOption('url')) {
+                this.setOption('url', '/ajax-cart/cart/');
+            }
             Event.observe(_d, 'dom:loaded', this._domLoaded.bind(this));
+        },
+        getOption: function(key)
+        {
+            return this._config.get(key);
+        },
+        setOption: function(key, value)
+        {
+            return this._config.set(key, value);
         },
         _domLoaded: function()
         {
@@ -66,10 +76,7 @@
                         if (!response) {
                             form.originalSubmit();
                         } else {
-
-                            self.displayMessages(response.messages);
-                            self.replaceCart(response.sidebarHtml);
-                            self.replaceToplink(response.cartLink);
+                            self._handleResponse(response);
                         }
                     })) {
                         form.originalSubmit();
@@ -103,9 +110,7 @@
                     self.addProduct({
                         product: product
                     }, function(response) {
-                        self.displayMessages(response.messages);
-                        self.replaceCart(response.sidebarHtml);
-                        self.replaceToplink(response.cartLink);
+                        self._handleResponse(response);
                         elem.removeAttribute('disabled');
                         elem.removeClassName('loading');
                     });
@@ -136,19 +141,18 @@
             if (matches = pattern.exec(href)) {
                 $(evt.element()).addClassName('loading');
                 this.removeProduct({
-                    id: matches[1]
-                }, function(response) {
-                    self.displayMessages(response.messages);
-                    self.replaceCart(response.sidebarHtml);
-                    self.replaceToplink(response.cartLink);
-                });
+                        id: matches[1]
+                    },
+                    function(response) {
+                        self._handleResponse(response);
+                    });
             }
             return false;
         },
         addProduct: function(params, callback)
         {
             params.isAjax = 1;
-            new Ajax.Request(this._config.url + 'add', {
+            new Ajax.Request(this.getOption('url') + 'add', {
                 method: 'post',
                 parameters: params,
                 onSuccess: function(transport) {
@@ -157,7 +161,7 @@
                         try {
                             response = eval('(' + transport.responseText + ')');
                         } catch (e) {
-                            console.log(e);
+                            // console.log(e);
                         }
                         callback(response);
                     }
@@ -167,7 +171,7 @@
         removeProduct: function(params, callback)
         {
             params.isAjax = 1;
-            new Ajax.Request(this._config.url + 'delete', {
+            new Ajax.Request(this.getOption('url') + 'delete', {
                 method: 'post',
                 parameters: params,
                 onSuccess: function(transport) {
@@ -176,7 +180,7 @@
                         try {
                             response = eval('(' + transport.responseText + ')');
                         } catch (e) {
-                            console.log(e);
+                            // console.log(e);
                         }
                         callback(response);
                     }
@@ -206,25 +210,51 @@
             }
             return true;
         },
-        displayMessages: function(messages)
+        _handleResponse: function(response)
         {
-            if (!messages.length) {
+            var customHandler = this.getOption('responseHandler');
+            if (typeof customHandler == 'function') {
+                customHandler(response);
                 return;
             }
 
-            var notify = _w._zkillemanNotify;
-            for (var i = 0; i < messages.length; ++i) {
-                // if notify module is available, use it!
-                if (typeof notify == 'object' &&
-                        typeof notify.addMessage == 'function') {
-                    notify.addMessage(messages[i]);
-                } else {
-                    alert(messages[i].text);
-                }
+            this.displayMessages(response.messages);
+            this.replaceCart(response.sidebarHtml);
+            this.replaceToplink(response.cartLink);
+        },
+        displayMessages: function(messages)
+        {
+            if (!Object.isArray(messages)) {
+                return;
+            }
+
+            var customHandler = this.getOption('messageHandler');
+            if (typeof customHandler == 'function') {
+                customHandler(messages);
+                return;
+            }
+
+            if (_w._zkillemanNotify) {
+                messages.each(function(message) {
+                    _w._zkillemanNotify.addMessage(message);
+                });
+                return;
+            }
+
+            if (this.getOption('noAlerts') !== true) {
+                messages.each(function(message) {
+                    alert(message.text);
+                });
             }
         },
         replaceCart: function(cartHtml)
         {
+            var customHandler = this.getOption('cartHandler');
+            if (typeof customHandler == 'function') {
+                customHandler(cartHtml);
+                return;
+            }
+
             $$('.block-cart').each(function(elem) {
                 Element.replace(elem, cartHtml);
             });
@@ -236,8 +266,14 @@
         },
         replaceToplink: function(toplink)
         {
+            var customHandler = this.getOption('toplinkHandler');
+            if (typeof customHandler == 'function') {
+                customHandler(toplink);
+                return;
+            }
+
             if (typeof toplink != 'object' || !toplink.label) {
-                return false;
+                return;
             }
             var label = toplink.label;
             var title = toplink.title || label;
