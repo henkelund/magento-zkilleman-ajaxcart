@@ -38,6 +38,9 @@
             if (!this.getOption('url')) {
                 this.setOption('url', '/ajax-cart/cart/');
             }
+            this.setOption('onSuccess',       function(response) {});
+            this.setOption('onAddSuccess',    function(response) {});
+            this.setOption('onRemoveSuccess', function(response) {});
             Event.observe(_d, 'dom:loaded', this._domLoaded.bind(this));
         },
         getOption: function(key)
@@ -151,6 +154,7 @@
         },
         addProduct: function(params, callback)
         {
+            var self = this;
             params.isAjax = 1;
             new Ajax.Request(this.getOption('url') + 'add', {
                 method: 'post',
@@ -163,6 +167,12 @@
                         } catch (e) {
                             // console.log(e);
                         }
+                        if (typeof self.getOption('onSuccess') == 'function') {
+                            self.getOption('onSuccess')(response);
+                        }
+                        if (typeof self.getOption('onAddSuccess') == 'function') {
+                            self.getOption('onAddSuccess')(response);
+                        }
                         callback(response);
                     }
                 }
@@ -170,6 +180,7 @@
         },
         removeProduct: function(params, callback)
         {
+            var self = this;
             params.isAjax = 1;
             new Ajax.Request(this.getOption('url') + 'delete', {
                 method: 'post',
@@ -181,6 +192,12 @@
                             response = eval('(' + transport.responseText + ')');
                         } catch (e) {
                             // console.log(e);
+                        }
+                        if (typeof self.getOption('onSuccess') == 'function') {
+                            self.getOption('onSuccess')(response);
+                        }
+                        if (typeof self.getOption('onRemoveSuccess') == 'function') {
+                            self.getOption('onRemoveSuccess')(response);
                         }
                         callback(response);
                     }
