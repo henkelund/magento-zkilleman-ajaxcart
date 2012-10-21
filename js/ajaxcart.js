@@ -56,9 +56,10 @@
             var form = _w.productAddToCartForm;
             if (typeof form != 'undefined') {
                 this._replaceProductForm(form);
+            } else {
+                this._replaceListClickActions();
             }
 
-            this._replaceListClickActions();
             this._replaceRemoveListeners();
         },
         _replaceProductForm: function(form)
