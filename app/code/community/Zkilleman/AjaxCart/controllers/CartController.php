@@ -77,6 +77,9 @@ class Zkilleman_AjaxCart_CartController extends Mage_Checkout_CartController
      */
     protected function _prepareResponse()
     {
+        $config = Mage::getSingleton('ajaxcart/config');
+        /* @var $config Zkilleman_AjaxCart_Model_Config */
+
         // drain session messages
         $messages = array();
         foreach (Mage::getSingleton('checkout/session')
@@ -90,30 +93,34 @@ class Zkilleman_AjaxCart_CartController extends Mage_Checkout_CartController
             );
         }
 
-        $this->loadLayout();
-        $topLinksBlock = $this->getLayout()->getBlock('top.links');
-        $sidebarBlock  = $this->getLayout()->getBlock('cart_sidebar');
-
-        $cartLink = false;
-        if ($topLinksBlock && $topLinksBlock instanceof Mage_Page_Block_Template_Links) {
-            foreach ($topLinksBlock->getLinks() as $link) {
-                if ($link->getAParams() == 'class="top-link-cart"') {
-                    $cartLink = $link->getData();
-                    break;
-                }
-            }
-        }
-
         $responseObject = new Varien_Object(array(
             'messages'      => $messages,
-            'sidebarHtml'   => $sidebarBlock ? $sidebarBlock->toHtml() : '',
-            'cartLink'      => $cartLink,
             'action'        => $this->getRequest()->getActionName(),
             'requestParams' => $this->getRequest()->getParams()
         ));
 
-        Mage::dispatchEvent(
-                self::EVENT_RESPONSE, array('response_object' => $responseObject));
+        $this->loadLayout();
+        foreach ($config->getResponseBlockNames() as $name => $label) {
+            $block = $this->getLayout()->getBlock($name);
+            if (!$block) {
+                $responseObject->setData($label, '');
+            } else if ($name == 'top.links'
+                        && $block instanceof Mage_Page_Block_Template_Links) {
+                foreach ($block->getLinks() as $link) {
+                    if ($link->getAParams() == 'class="top-link-cart"') {
+                        $responseObject->setData('cartLink', $link->getData());
+                        break;
+                    }
+                }
+            } else {
+                $responseObject->setData($label, $block->toHtml());
+            }
+        }
+
+        Mage::dispatchEvent(self::EVENT_RESPONSE, array(
+            'action'          => $this,
+            'response_object' => $responseObject
+        ));
 
         // reset redirect headers and send response
         $this->getResponse()

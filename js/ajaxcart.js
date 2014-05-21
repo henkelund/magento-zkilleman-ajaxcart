@@ -33,14 +33,15 @@
         _actionProductPattern: null,
         initialize: function(config)
         {
-            this._config = $H(config || {});
+            this._config = $H({
+                onSuccess:       function(response) {},
+                onAddSuccess:    function(response) {},
+                onRemoveSuccess: function(response) {}
+            }).merge(config || {});
             this._actionProductPattern = /\/product\/(\d*)\D|$/;
             if (!this.getOption('url')) {
                 this.setOption('url', '/ajax-cart/cart/');
             }
-            this.setOption('onSuccess',       function(response) {});
-            this.setOption('onAddSuccess',    function(response) {});
-            this.setOption('onRemoveSuccess', function(response) {});
             Event.observe(_d, 'dom:loaded', this._domLoaded.bind(this));
         },
         getOption: function(key)
@@ -97,23 +98,32 @@
         {
             var self = this;
             $$('.btn-cart').each(function(elem) {
+                var params = {};
                 var clickAction = new String(elem.getAttribute('onclick'));
                 if (!(/\/checkout\/cart\/add\//.test(clickAction))) {
                     return;
                 }
+
+                // parse product ID from click action
                 var actionMatch = clickAction.match(self._actionProductPattern);
-                var product = actionMatch.length > 1 ? parseInt(actionMatch[1]) : 0;
-                if (isNaN(product) || product <= 0) {
+                params.product = actionMatch && actionMatch.length > 1
+                    ? parseInt(actionMatch[1])
+                    : 0;
+                if (isNaN(params.product) || params.product <= 0) {
                     return;
+                }
+
+                // parse form key from click action
+                var keyMatch = clickAction.match(/\/form_key\/([a-zA-Z0-9]+)/);
+                if (keyMatch && keyMatch.length > 1) {
+                    params.form_key = keyMatch[1];
                 }
 
                 elem.setAttribute('onclick', 'return false;');
                 elem.observe('click', function() {
                     elem.setAttribute('disabled', 'disabled');
                     elem.addClassName('loading');
-                    self.addProduct({
-                        product: product
-                    }, function(response) {
+                    self.addProduct(params, function(response) {
                         self._handleResponse(response);
                         elem.removeAttribute('disabled');
                         elem.removeClassName('loading');
@@ -236,9 +246,15 @@
                 return;
             }
 
-            this.displayMessages(response.messages);
-            this.replaceCart(response.sidebarHtml);
-            this.replaceToplink(response.cartLink);
+            if (response.messages !== undefined) {
+                this.displayMessages(response.messages);
+            }
+            if (response.sidebarCartHtml !== undefined) {
+                this.replaceCart(response.sidebarCartHtml);
+            }
+            if (response.cartLink !== undefined) {
+                this.replaceToplink(response.cartLink);
+            }
         },
         displayMessages: function(messages)
         {
@@ -281,6 +297,8 @@
 
             // add listener to configurable details (/js/varien/js.js)
             truncateOptions();
+
+            document.fire('ajaxcart:replaced');
         },
         replaceToplink: function(toplink)
         {
